@@ -3,7 +3,11 @@ package update
 
 import (
 	"fmt"
+	"net/url"
 	"os"
+
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	microerror "github.com/giantswarm/microkit/error"
 	micrologger "github.com/giantswarm/microkit/logger"
@@ -22,8 +26,7 @@ var (
 // Config represents the configuration used to create a new update command.
 type Config struct {
 	// Dependencies.
-	Logger  micrologger.Logger
-	Updater *updater.Updater
+	Logger micrologger.Logger
 }
 
 // DefaultConfig provides a default configuration to create a new update
@@ -31,8 +34,7 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		// Dependencies.
-		Logger:  nil,
-		Updater: nil,
+		Logger: nil,
 	}
 }
 
@@ -42,14 +44,10 @@ func New(config Config) (*Command, error) {
 	if config.Logger == nil {
 		return nil, microerror.MaskAnyf(invalidConfigError, "logger must not be empty")
 	}
-	if config.Updater == nil {
-		return nil, microerror.MaskAnyf(invalidConfigError, "updater must not be empty")
-	}
 
 	newCommand := &Command{
 		// Dependencies.
-		logger:  config.Logger,
-		updater: config.Updater,
+		logger: config.Logger,
 
 		// Internals.
 		cobraCommand: nil,
@@ -78,8 +76,7 @@ func New(config Config) (*Command, error) {
 
 type Command struct {
 	// Dependencies.
-	logger  micrologger.Logger
-	updater *updater.Updater
+	logger micrologger.Logger
 
 	// Internals.
 	cobraCommand *cobra.Command
@@ -128,6 +125,63 @@ func (c *Command) execute() error {
 		}
 	}
 
+	// We also need to create the updater which is able to update Kubernetes
+	// endpoints.
+	var newUpdater *updater.Updater
+	{
+		var kubernetesClient *kubernetes.Clientset
+		{
+			var restConfig *rest.Config
+
+			if f.Kubernetes.InCluster {
+				c.logger.Log("debug", "creating in-cluster config")
+				restConfig, err = rest.InClusterConfig()
+				if err != nil {
+					return microerror.MaskAny(err)
+				}
+
+				if f.Kubernetes.Address != "" {
+					c.logger.Log("debug", "using explicit api server")
+					restConfig.Host = f.Kubernetes.Address
+				}
+			} else {
+				if f.Kubernetes.Address == "" {
+					return microerror.MaskAnyf(invalidConfigError, "kubernetes address must not be empty")
+				}
+
+				c.logger.Log("debug", "creating out-cluster config")
+
+				// Kubernetes listen URL.
+				u, err := url.Parse(f.Kubernetes.Address)
+				if err != nil {
+					return microerror.MaskAny(err)
+				}
+
+				restConfig = &rest.Config{
+					Host: u.String(),
+					TLSClientConfig: rest.TLSClientConfig{
+						CAFile:   f.Kubernetes.TLS.CaFile,
+						CertFile: f.Kubernetes.TLS.CrtFile,
+						KeyFile:  f.Kubernetes.TLS.KeyFile,
+					},
+				}
+			}
+
+			kubernetesClient, err = kubernetes.NewForConfig(restConfig)
+			if err != nil {
+				return microerror.MaskAny(err)
+			}
+		}
+
+		updaterConfig := updater.DefaultConfig()
+		updaterConfig.KubernetesClient = kubernetesClient
+		updaterConfig.Logger = c.logger
+		newUpdater, err = updater.New(updaterConfig)
+		if err != nil {
+			return microerror.MaskAny(err)
+		}
+	}
+
 	// Once we know which provider to use we execute it to lookup the pod
 	// information we are interested in.
 	var podInfos []provider.PodInfo
@@ -142,7 +196,7 @@ func (c *Command) execute() error {
 	// Use the updater to actually update the endpoints identified by the provided
 	// flags.
 	{
-		err = c.updater.Update(podInfos)
+		err = newUpdater.Update(podInfos)
 		if err != nil {
 			return microerror.MaskAny(err)
 		}
