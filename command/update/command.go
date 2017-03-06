@@ -61,6 +61,7 @@ func New(config Config) (*Command, error) {
 	}
 
 	newCommand.CobraCommand().PersistentFlags().StringVar(&f.Kubernetes.Address, "service.kubernetes.address", "http://127.0.0.1:6443", "Address used to connect to Kubernetes. When empty in-cluster config is created.")
+	newCommand.CobraCommand().PersistentFlags().StringVar(&f.Kubernetes.Cluster.Namespace, "service.kubernetes.cluster.namespace", "default", "Namespace of the guest cluster which endpoints should be updated.")
 	newCommand.CobraCommand().PersistentFlags().BoolVar(&f.Kubernetes.InCluster, "service.kubernetes.inCluster", false, "Whether to use the in-cluster config to authenticate with Kubernetes.")
 	newCommand.CobraCommand().PersistentFlags().StringVar(&f.Kubernetes.TLS.CaFile, "service.kubernetes.tls.caFile", "", "Certificate authority file path to use to authenticate with Kubernetes.")
 	newCommand.CobraCommand().PersistentFlags().StringVar(&f.Kubernetes.TLS.CrtFile, "service.kubernetes.tls.crtFile", "", "Certificate file path to use to authenticate with Kubernetes.")
@@ -196,7 +197,7 @@ func (c *Command) execute() error {
 	// Use the updater to actually update the endpoints identified by the provided
 	// flags.
 	{
-		err = newUpdater.Update(podInfos)
+		err = newUpdater.Update(f.Kubernetes.Cluster.Namespace, podInfos)
 		if err != nil {
 			return microerror.MaskAny(err)
 		}
