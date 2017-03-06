@@ -1,8 +1,6 @@
 package updater
 
 import (
-	"fmt"
-
 	microerror "github.com/giantswarm/microkit/error"
 	micrologger "github.com/giantswarm/microkit/logger"
 	"k8s.io/client-go/kubernetes"
@@ -59,27 +57,33 @@ func (p *Updater) Update(namespace string, podInfos []provider.PodInfo) error {
 		return microerror.MaskAny(err)
 	}
 
-	fmt.Printf("\n")
-	for _, e := range endpoints.Items {
-		fmt.Printf("before: %#v\n", e)
-		for _, s := range e.Subsets {
-			for i, _ := range s.Addresses {
-				for _, pi := range podInfos {
-					if s.Addresses[i].TargetRef.Name != pi.Name {
-						continue
-					}
-
-					fmt.Printf("%#v\n", s.Addresses[i].IP)
-					s.Addresses[i].IP = pi.IP.String()
-					fmt.Printf("%#v\n", s.Addresses[i].IP)
+	for i, e := range endpoints.Items {
+		for j, s := range e.Subsets {
+			for k, a := range s.Addresses {
+				pi, err := podInfoByName(podInfos, a.TargetRef.Name)
+				if err != nil {
+					return microerror.MaskAny(err)
 				}
+
+				endpoints.Items[i].Subsets[j].Addresses[k].IP = pi.IP.String()
 			}
 		}
-		fmt.Printf("\n")
-		fmt.Printf("after: %#v\n", e)
-		// TODO update the endpoints
+
+		_, err = p.kubernetesClient.Endpoints(namespace).Update(&endpoints.Items[i])
+		if err != nil {
+			return microerror.MaskAny(err)
+		}
 	}
-	fmt.Printf("\n")
 
 	return nil
+}
+
+func podInfoByName(podInfos []provider.PodInfo, name string) (provider.PodInfo, error) {
+	for _, pi := range podInfos {
+		if pi.Name == name {
+			return pi, nil
+		}
+	}
+
+	return provider.PodInfo{}, microerror.MaskAnyf(executionFailedError, "pod info for name '%s' not found")
 }
