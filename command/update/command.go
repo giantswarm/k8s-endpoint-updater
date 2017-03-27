@@ -16,6 +16,7 @@ import (
 
 	"github.com/giantswarm/k8s-endpoint-updater/command/update/flag"
 	"github.com/giantswarm/k8s-endpoint-updater/service/provider"
+	"github.com/giantswarm/k8s-endpoint-updater/service/provider/bridge"
 	"github.com/giantswarm/k8s-endpoint-updater/service/provider/env"
 	"github.com/giantswarm/k8s-endpoint-updater/service/provider/etcd"
 	"github.com/giantswarm/k8s-endpoint-updater/service/updater"
@@ -69,6 +70,7 @@ func New(config Config) (*Command, error) {
 	newCommand.CobraCommand().PersistentFlags().StringVar(&f.Kubernetes.TLS.CrtFile, "service.kubernetes.tls.crtFile", "", "Certificate file path to use to authenticate with Kubernetes.")
 	newCommand.CobraCommand().PersistentFlags().StringVar(&f.Kubernetes.TLS.KeyFile, "service.kubernetes.tls.keyFile", "", "Key file path to use to authenticate with Kubernetes.")
 
+	newCommand.cobraCommand.PersistentFlags().StringVar(&f.Provider.Bridge.Name, "provider.bridge.name", "", "Bridge name of the guest cluster VM on the host network.")
 	newCommand.cobraCommand.PersistentFlags().StringVar(&f.Provider.Env.Prefix, "provider.env.prefix", "K8S_ENDPOINT_UPDATER_POD_", "Prefix of environment variables providing pod names.")
 	newCommand.cobraCommand.PersistentFlags().StringVar(&f.Provider.Etcd.Address, "provider.etcd.address", "", "Address used to connect to etcd.")
 	newCommand.cobraCommand.PersistentFlags().StringVar(&f.Provider.Etcd.Kind, "provider.etcd.kind", "etcdv2", "Etcd storage client version to use.")
@@ -119,6 +121,20 @@ func (c *Command) execute() error {
 	{
 		k := f.Provider.Kind
 		switch k {
+		case bridge.Kind:
+			if len(f.Updater.Pod.Names) != 1 {
+				return microerror.MaskAnyf(invalidConfigError, "bridge provider expects 1 pod name")
+			}
+			podName := f.Updater.Pod.Names[0]
+
+			bridgeConfig := bridge.DefaultConfig()
+			bridgeConfig.BridgeName = f.Provider.Bridge.Name
+			bridgeConfig.Logger = c.logger
+			bridgeConfig.PodName = podName
+			newProvider, err = bridge.New(bridgeConfig)
+			if err != nil {
+				return microerror.MaskAny(err)
+			}
 		case env.Kind:
 			envConfig := env.DefaultConfig()
 			envConfig.Logger = c.logger
@@ -149,6 +165,8 @@ func (c *Command) execute() error {
 			if err != nil {
 				return microerror.MaskAny(err)
 			}
+		default:
+			return microerror.MaskAnyf(invalidConfigError, "unsupported provider kind '%s'", k)
 		}
 	}
 
@@ -213,7 +231,6 @@ func (c *Command) execute() error {
 	// information we are interested in.
 	var podInfos []provider.PodInfo
 	{
-		// TODO provide pod names to Lookup
 		podInfos, err = newProvider.Lookup()
 		if err != nil {
 			return microerror.MaskAny(err)
