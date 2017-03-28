@@ -3,6 +3,7 @@ package update
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"time"
@@ -227,6 +228,13 @@ func (c *Command) execute() error {
 			return microerror.MaskAny(err)
 		}
 	}
+
+	is, err := net.Interfaces()
+	if err != nil {
+		return nil, microerror.MaskAny(err)
+	}
+	fmt.Printf("bridge name: %#v\n", p.bridgeName)
+	fmt.Printf("interface: %#v\n", is)
 
 	time.Sleep(1 * time.Hour)
 
