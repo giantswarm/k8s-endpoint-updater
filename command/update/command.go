@@ -6,11 +6,11 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"time"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
+	"github.com/cenk/backoff"
 	microerror "github.com/giantswarm/microkit/error"
 	micrologger "github.com/giantswarm/microkit/logger"
 	microstorage "github.com/giantswarm/microkit/storage"
@@ -233,20 +233,25 @@ func (c *Command) execute() error {
 	if err != nil {
 		return microerror.MaskAny(err)
 	}
-	fmt.Printf("bridge name: %#v\n", f.Provider.Bridge.Name)
-	fmt.Printf("bridge name: %#v\n", f.Updater.Pod.Names[0])
-	fmt.Printf("interface: %#v\n", is)
-
-	time.Sleep(1 * time.Hour)
 
 	// Once we know which provider to use we execute it to lookup the pod
 	// information we are interested in.
 	var podInfos []provider.PodInfo
 	{
-		podInfos, err = newProvider.Lookup()
+		action := func() error {
+			podInfos, err = newProvider.Lookup()
+			if err != nil {
+				return microerror.MaskAny(err)
+			}
+
+			return nil
+		}
+
+		err := backoff.Retry(action, backoff.NewExponentialBackOff())
 		if err != nil {
 			return microerror.MaskAny(err)
 		}
+
 		for _, pi := range podInfos {
 			c.logger.Log("debug", "found pod info", "IP", pi.IP.String(), "pod", pi.Name)
 		}
