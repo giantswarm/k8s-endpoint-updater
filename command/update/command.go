@@ -235,6 +235,9 @@ func (c *Command) execute() error {
 		if err != nil {
 			return microerror.MaskAny(err)
 		}
+		for _, pi := range podInfos {
+			c.logger.Log("debug", "found pod info", "IP", pi.IP.String(), "pod", pi.Name)
+		}
 	}
 
 	// Use the updater to actually update the endpoints identified by the provided
