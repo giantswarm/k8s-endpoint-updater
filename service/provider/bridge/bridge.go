@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"errors"
+	"fmt"
 	"net"
 
 	microerror "github.com/giantswarm/microkit/error"
@@ -39,6 +40,7 @@ func DefaultConfig() Config {
 
 		// Settings.
 		BridgeName: "",
+		PodName:    "",
 	}
 }
 
@@ -79,6 +81,12 @@ type Provider struct {
 }
 
 func (p *Provider) Lookup() ([]provider.PodInfo, error) {
+	is, err := net.Interfaces()
+	if err != nil {
+		return nil, microerror.MaskAny(err)
+	}
+	fmt.Printf("bridge name: %#v\n", p.bridgeName)
+	fmt.Printf("interface: %#v\n", is)
 	// We fetch the interface first because it holds all IP addresses associated
 	// with it.
 	netInterface, err := net.InterfaceByName(p.bridgeName)
