@@ -231,9 +231,10 @@ func (c *Command) execute() error {
 
 	is, err := net.Interfaces()
 	if err != nil {
-		return nil, microerror.MaskAny(err)
+		return microerror.MaskAny(err)
 	}
-	fmt.Printf("bridge name: %#v\n", p.bridgeName)
+	fmt.Printf("bridge name: %#v\n", f.Provider.Bridge.Name)
+	fmt.Printf("bridge name: %#v\n", f.Updater.Pod.Names[0])
 	fmt.Printf("interface: %#v\n", is)
 
 	time.Sleep(1 * time.Hour)
