@@ -6,7 +6,6 @@ import (
 
 	microerror "github.com/giantswarm/microkit/error"
 	micrologger "github.com/giantswarm/microkit/logger"
-	microstorage "github.com/giantswarm/microkit/storage"
 
 	"github.com/giantswarm/k8s-endpoint-updater/service/provider"
 )
@@ -18,8 +17,7 @@ const (
 // Config represents the configuration used to create a new provider.
 type Config struct {
 	// Dependencies.
-	Logger  micrologger.Logger
-	Storage microstorage.Service
+	Logger micrologger.Logger
 
 	// Settings.
 
@@ -37,8 +35,7 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		// Dependencies.
-		Logger:  nil,
-		Storage: nil,
+		Logger: nil,
 
 		// Settings.
 		BridgeName: "",
@@ -49,10 +46,7 @@ func DefaultConfig() Config {
 func New(config Config) (*Provider, error) {
 	// Dependencies.
 	if config.Logger == nil {
-		return nil, microerror.MaskAnyf(invalidConfigError, "config.Logger not be empty")
-	}
-	if config.Storage == nil {
-		return nil, microerror.MaskAnyf(invalidConfigError, "config.Storage not be empty")
+		return nil, microerror.MaskAnyf(invalidConfigError, "config.Logger must not be empty")
 	}
 
 	// Settings.
@@ -65,8 +59,7 @@ func New(config Config) (*Provider, error) {
 
 	newProvider := &Provider{
 		// Dependencies.
-		logger:  config.Logger,
-		storage: config.Storage,
+		logger: config.Logger,
 
 		// Settings.
 		bridgeName: config.BridgeName,
@@ -78,8 +71,7 @@ func New(config Config) (*Provider, error) {
 
 type Provider struct {
 	// Dependencies.
-	logger  micrologger.Logger
-	storage microstorage.Service
+	logger micrologger.Logger
 
 	// Settings.
 	bridgeName string
