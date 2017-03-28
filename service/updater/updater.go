@@ -1,6 +1,9 @@
 package updater
 
 import (
+	"encoding/json"
+	"fmt"
+
 	microerror "github.com/giantswarm/microkit/error"
 	micrologger "github.com/giantswarm/microkit/logger"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,6 +77,13 @@ func (p *Updater) Update(namespace string, podInfos []provider.PodInfo) error {
 		if !found {
 			return microerror.MaskAnyf(executionFailedError, "endpoints not updated due to missing pod info")
 		}
+
+		b, err := json.MarshalIndent(endpoints, "", "  ")
+		if err != nil {
+			return microerror.MaskAny(err)
+		}
+		fmt.Printf("endpoint structure used to update endpoints in kubernetes: \n")
+		fmt.Printf("%s\n", b)
 
 		_, err = p.kubernetesClient.Endpoints(namespace).Update(&endpoints.Items[i])
 		if err != nil {
