@@ -111,6 +111,9 @@ func (c *Command) Execute(cmd *cobra.Command, args []string) {
 	}
 
 	c.logger.Log("info", "finished updating Kubernetes endpoint")
+
+	// Sleep forver to make Kubernetes happy. It does not like terminated pods.
+	select {}
 }
 
 func (c *Command) execute() error {
