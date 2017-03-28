@@ -1,13 +1,11 @@
 package updater
 
 import (
-	"encoding/json"
-	"fmt"
-
 	microerror "github.com/giantswarm/microkit/error"
 	micrologger "github.com/giantswarm/microkit/logger"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	apiv1 "k8s.io/client-go/pkg/api/v1"
 
 	"github.com/giantswarm/k8s-endpoint-updater/service/provider"
 )
@@ -55,37 +53,36 @@ type Updater struct {
 }
 
 func (p *Updater) Update(namespace string, podInfos []provider.PodInfo) error {
-	endpoints, err := p.kubernetesClient.Endpoints(namespace).List(v1.ListOptions{})
-	if err != nil {
-		return microerror.MaskAny(err)
-	}
-
-	var found bool
-	for i, e := range endpoints.Items {
-		for j, s := range e.Subsets {
-			for k, a := range s.Addresses {
-				pi, err := podInfoByName(podInfos, a.TargetRef.Name)
-				if err != nil {
-					continue
-				}
-
-				found = true
-				endpoints.Items[i].Subsets[j].Addresses[k].IP = pi.IP.String()
-			}
+	for _, pi := range podInfos {
+		endpoint := &apiv1.Endpoints{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "master",
+			},
+			Subsets: []apiv1.EndpointSubset{
+				{
+					Addresses: []apiv1.EndpointAddress{
+						{
+							IP: pi.IP.String(),
+						},
+					},
+					Ports: []apiv1.EndpointPort{
+						{
+							Name: "etcd",
+							Port: 2379,
+						},
+						{
+							Name: "api",
+							Port: 6443,
+						},
+					},
+				},
+			},
 		}
 
-		if !found {
-			return microerror.MaskAnyf(executionFailedError, "endpoints not updated due to missing pod info")
-		}
-
-		b, err := json.MarshalIndent(endpoints, "", "  ")
-		if err != nil {
-			return microerror.MaskAny(err)
-		}
-		fmt.Printf("endpoint structure used to update endpoints in kubernetes: \n")
-		fmt.Printf("%s\n", b)
-
-		_, err = p.kubernetesClient.Endpoints(namespace).Update(&endpoints.Items[i])
+		_, err := p.kubernetesClient.Endpoints(namespace).Create(endpoint)
 		if err != nil {
 			return microerror.MaskAny(err)
 		}
