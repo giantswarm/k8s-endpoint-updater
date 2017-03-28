@@ -3,7 +3,6 @@ package update
 
 import (
 	"fmt"
-	"net"
 	"net/url"
 	"os"
 
@@ -227,11 +226,6 @@ func (c *Command) execute() error {
 		if err != nil {
 			return microerror.MaskAny(err)
 		}
-	}
-
-	is, err := net.Interfaces()
-	if err != nil {
-		return microerror.MaskAny(err)
 	}
 
 	// Once we know which provider to use we execute it to lookup the pod
