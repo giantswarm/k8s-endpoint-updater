@@ -157,5 +157,5 @@ func ipv4FromInterface(netInterface *net.Interface) (net.IP, error) {
 		return ipv4, nil
 	}
 
-	return net.IP{}, errors.New("IPV4 not found")
+	return nil, errors.New("IPV4 not found")
 }
