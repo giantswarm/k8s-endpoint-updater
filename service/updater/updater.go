@@ -57,16 +57,22 @@ func (p *Updater) Update(namespace string, podInfos []provider.PodInfo) error {
 		return microerror.MaskAny(err)
 	}
 
+	var found bool
 	for i, e := range endpoints.Items {
 		for j, s := range e.Subsets {
 			for k, a := range s.Addresses {
 				pi, err := podInfoByName(podInfos, a.TargetRef.Name)
 				if err != nil {
-					return microerror.MaskAny(err)
+					continue
 				}
 
+				found = true
 				endpoints.Items[i].Subsets[j].Addresses[k].IP = pi.IP.String()
 			}
+		}
+
+		if !found {
+			return microerror.MaskAnyf(executionFailedError, "endpoints not updated due to missing pod info")
 		}
 
 		_, err = p.kubernetesClient.Endpoints(namespace).Update(&endpoints.Items[i])
@@ -85,5 +91,5 @@ func podInfoByName(podInfos []provider.PodInfo, name string) (provider.PodInfo, 
 		}
 	}
 
-	return provider.PodInfo{}, microerror.MaskAnyf(executionFailedError, "pod info for name '%s' not found")
+	return provider.PodInfo{}, microerror.MaskAnyf(executionFailedError, "pod info for name '%s' not found", name)
 }
