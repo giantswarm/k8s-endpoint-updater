@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"time"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -226,6 +227,8 @@ func (c *Command) execute() error {
 			return microerror.MaskAny(err)
 		}
 	}
+
+	time.Sleep(1 * time.Hour)
 
 	// Once we know which provider to use we execute it to lookup the pod
 	// information we are interested in.
