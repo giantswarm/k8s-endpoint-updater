@@ -52,14 +52,19 @@ type Updater struct {
 	logger           micrologger.Logger
 }
 
-func (p *Updater) Update(namespace string, podInfos []provider.PodInfo) error {
+func (p *Updater) Update(namespace, service string, podInfos []provider.PodInfo) error {
 	for _, pi := range podInfos {
+		s, err := p.kubernetesClient.Services(namespace).Get(service, metav1.GetOptions{})
+		if err != nil {
+			return microerror.MaskAny(err)
+		}
+
 		endpoint := &apiv1.Endpoints{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: "v1",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "master",
+				Name: service,
 			},
 			Subsets: []apiv1.EndpointSubset{
 				{
@@ -68,21 +73,12 @@ func (p *Updater) Update(namespace string, podInfos []provider.PodInfo) error {
 							IP: pi.IP.String(),
 						},
 					},
-					Ports: []apiv1.EndpointPort{
-						{
-							Name: "etcd",
-							Port: 2379,
-						},
-						{
-							Name: "api",
-							Port: 6443,
-						},
-					},
+					Ports: serviceToPorts(s),
 				},
 			},
 		}
 
-		_, err := p.kubernetesClient.Endpoints(namespace).Create(endpoint)
+		_, err = p.kubernetesClient.Endpoints(namespace).Create(endpoint)
 		if err != nil {
 			return microerror.MaskAny(err)
 		}
@@ -99,4 +95,19 @@ func podInfoByName(podInfos []provider.PodInfo, name string) (provider.PodInfo, 
 	}
 
 	return provider.PodInfo{}, microerror.MaskAnyf(executionFailedError, "pod info for name '%s' not found", name)
+}
+
+func serviceToPorts(s *apiv1.Service) []apiv1.EndpointPort {
+	var ports []apiv1.EndpointPort
+
+	for _, p := range s.Spec.Ports {
+		port := apiv1.EndpointPort{
+			Name: p.Name,
+			Port: p.Port,
+		}
+
+		ports = append(ports, port)
+	}
+
+	return ports
 }
