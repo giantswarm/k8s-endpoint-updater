@@ -1,8 +1,6 @@
 package updater
 
 import (
-	"encoding/json"
-	"fmt"
 	"net"
 
 	microerror "github.com/giantswarm/microkit/error"
@@ -109,7 +107,6 @@ func (p *Updater) appendIPs(namespace, service string, podInfos []provider.PodIn
 		if e.Name != service {
 			// In case the service is set to "worker" and the endpoint name is
 			// "master" we skip until we find the right endpoint.
-			fmt.Printf("%s != %s: skipping\n", e.Name, service)
 			continue
 		}
 
@@ -117,26 +114,17 @@ func (p *Updater) appendIPs(namespace, service string, podInfos []provider.PodIn
 			for _, pi := range podInfos {
 				addresses := endpoints.Items[i].Subsets[j].Addresses
 				if ipInAddresses(addresses, pi.IP) {
-					fmt.Printf("skipping IP: %#v\n", pi.IP.String())
 					continue
 				}
 
 				address := apiv1.EndpointAddress{
 					IP: pi.IP.String(),
 				}
-				fmt.Printf("adding IP: %#v\n", pi.IP.String())
 
 				addresses = append(addresses, address)
 				endpoints.Items[i].Subsets[j].Addresses = addresses
 			}
 		}
-
-		b, err := json.MarshalIndent(endpoints, "", "  ")
-		if err != nil {
-			return microerror.MaskAny(err)
-		}
-		fmt.Printf("endpoint structure used to update endpoints in kubernetes: \n")
-		fmt.Printf("%s\n", b)
 
 		_, err = p.kubernetesClient.Endpoints(namespace).Update(&endpoints.Items[i])
 		if err != nil {
