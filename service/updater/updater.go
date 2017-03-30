@@ -1,10 +1,12 @@
 package updater
 
 import (
-	"strings"
+	"encoding/json"
+	"fmt"
 
 	microerror "github.com/giantswarm/microkit/error"
 	micrologger "github.com/giantswarm/microkit/logger"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
@@ -82,11 +84,44 @@ func (p *Updater) Update(namespace, service string, podInfos []provider.PodInfo)
 
 		_, err = p.kubernetesClient.Endpoints(namespace).Create(endpoint)
 		if err != nil {
-			// TODO super dirty hack to prevent workers from crashing the whole guest
-			// cluster.
-			if strings.Contains(err.Error(), "already exists") {
-				continue
+			if errors.IsAlreadyExists(err) {
+				endpoints, err := p.kubernetesClient.Endpoints(namespace).List(metav1.ListOptions{})
+				if err != nil {
+					return microerror.MaskAny(err)
+				}
+
+				for i, e := range endpoints.Items {
+					if e.Name != service {
+						// In case the service is set to "worker" and the endpoint name is
+						// "master" we skip until we find the right endpoint.
+						fmt.Printf("%s != service: skipping\n", e.Name, service)
+						continue
+					}
+
+					for j, _ := range e.Subsets {
+						for _, pi := range podInfos {
+							address := apiv1.EndpointAddress{
+								IP: pi.IP.String(),
+							}
+							fmt.Printf("address: %#v\n", address)
+							endpoints.Items[i].Subsets[j].Addresses = append(endpoints.Items[i].Subsets[j].Addresses, address)
+						}
+					}
+
+					b, err := json.MarshalIndent(endpoints, "", "  ")
+					if err != nil {
+						return microerror.MaskAny(err)
+					}
+					fmt.Printf("endpoint structure used to update endpoints in kubernetes: \n")
+					fmt.Printf("%s\n", b)
+
+					_, err = p.kubernetesClient.Endpoints(namespace).Update(&endpoints.Items[i])
+					if err != nil {
+						return microerror.MaskAny(err)
+					}
+				}
 			}
+
 			return microerror.MaskAny(err)
 		}
 	}
