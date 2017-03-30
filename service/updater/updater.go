@@ -1,6 +1,8 @@
 package updater
 
 import (
+	"strings"
+
 	microerror "github.com/giantswarm/microkit/error"
 	micrologger "github.com/giantswarm/microkit/logger"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -80,6 +82,11 @@ func (p *Updater) Update(namespace, service string, podInfos []provider.PodInfo)
 
 		_, err = p.kubernetesClient.Endpoints(namespace).Create(endpoint)
 		if err != nil {
+			// TODO super dirty hack to prevent workers from crashing the whole guest
+			// cluster.
+			if strings.Contains(err.Error(), "already exists") {
+				continue
+			}
 			return microerror.MaskAny(err)
 		}
 	}
