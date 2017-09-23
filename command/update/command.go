@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -248,15 +250,15 @@ func (c *Command) execute() error {
 		}
 
 		for _, pi := range podInfos {
-			c.logger.Log("debug", "found pod info", "IP", pi.IP.String(), "pod", pi.Name)
+			c.logger.Log("debug", fmt.Sprintf("found pod info of service '%s'", f.Kubernetes.Cluster.Service), "IP", pi.IP.String(), "pod", pi.Name)
 		}
 	}
 
-	// Use the updater to actually update the endpoints identified by the provided
+	// Use the updater to actually add the endpoints identified by the provided
 	// flags.
 	{
 		action := func() error {
-			err := newUpdater.Update(f.Kubernetes.Cluster.Namespace, f.Kubernetes.Cluster.Service, podInfos)
+			err := newUpdater.Create(f.Kubernetes.Cluster.Namespace, f.Kubernetes.Cluster.Service, podInfos)
 			if err != nil {
 				return microerror.MaskAny(err)
 			}
@@ -269,8 +271,41 @@ func (c *Command) execute() error {
 			return microerror.MaskAny(err)
 		}
 
-		c.logger.Log("debug", fmt.Sprintf("updated endpoint for service '%s'", f.Kubernetes.Cluster.Service))
+		c.logger.Log("debug", fmt.Sprintf("added IPs to endpoint of service '%s'", f.Kubernetes.Cluster.Service))
 	}
+
+	// Listen to OS signals issued by the Kubernetes scheduler.
+	listener := make(chan os.Signal, 2)
+	signal.Notify(listener, syscall.SIGTERM, syscall.SIGKILL)
+
+	<-listener
+
+	// Use the updater to actually delete the endpoints identified by the provided
+	// flags.
+	go func() {
+		action := func() error {
+			err := newUpdater.Delete(f.Kubernetes.Cluster.Namespace, f.Kubernetes.Cluster.Service, podInfos)
+			if err != nil {
+				return microerror.MaskAny(err)
+			}
+
+			return nil
+		}
+
+		err := backoff.Retry(action, backoff.NewExponentialBackOff())
+		if err != nil {
+			c.logger.Log("error", fmt.Sprintf("%#v", microerror.MaskAny(err)))
+			os.Exit(1)
+		}
+
+		c.logger.Log("debug", fmt.Sprintf("removed IPs from endpoint of service '%s'", f.Kubernetes.Cluster.Service))
+
+		os.Exit(0)
+	}()
+
+	<-listener
+
+	os.Exit(0)
 
 	return nil
 }

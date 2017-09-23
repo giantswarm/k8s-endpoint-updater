@@ -55,7 +55,7 @@ type Updater struct {
 	logger           micrologger.Logger
 }
 
-func (p *Updater) Update(namespace, service string, podInfos []provider.PodInfo) error {
+func (p *Updater) Create(namespace, service string, podInfos []provider.PodInfo) error {
 	for _, pi := range podInfos {
 		s, err := p.kubernetesClient.Services(namespace).Get(service, metav1.GetOptions{})
 		if err != nil {
@@ -90,6 +90,36 @@ func (p *Updater) Update(namespace, service string, podInfos []provider.PodInfo)
 				return microerror.MaskAny(err)
 			}
 		} else if err != nil {
+			return microerror.MaskAny(err)
+		}
+	}
+
+	return nil
+}
+
+func (p *Updater) Delete(namespace, service string, podInfos []provider.PodInfo) error {
+	endpoints, err := p.kubernetesClient.Endpoints(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return microerror.MaskAny(err)
+	}
+
+	for i, e := range endpoints.Items {
+		if e.Name != service {
+			// In case the service is set to "worker" and the endpoint name is
+			// "master" we skip until we find the right endpoint.
+			continue
+		}
+
+		for j, _ := range e.Subsets {
+			for _, pi := range podInfos {
+				currentAddresses := endpoints.Items[i].Subsets[j].Addresses
+				desiredAddresses := removeIPFromAddresses(currentAddresses, pi.IP)
+				endpoints.Items[i].Subsets[j].Addresses = desiredAddresses
+			}
+		}
+
+		_, err = p.kubernetesClient.Endpoints(namespace).Update(&endpoints.Items[i])
+		if err != nil {
 			return microerror.MaskAny(err)
 		}
 	}
@@ -143,6 +173,20 @@ func ipInAddresses(addresses []apiv1.EndpointAddress, IP net.IP) bool {
 	}
 
 	return false
+}
+
+func removeIPFromAddresses(addresses []apiv1.EndpointAddress, IP net.IP) []apiv1.EndpointAddress {
+	var newAddresses []apiv1.EndpointAddress
+
+	for _, a := range addresses {
+		if a.IP == IP.String() {
+			continue
+		}
+
+		newAddresses = append(newAddresses, a)
+	}
+
+	return newAddresses
 }
 
 func podInfoByName(podInfos []provider.PodInfo, name string) (provider.PodInfo, error) {
