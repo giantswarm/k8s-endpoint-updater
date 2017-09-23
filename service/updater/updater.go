@@ -16,8 +16,8 @@ import (
 // Config represents the configuration used to create a new updater.
 type Config struct {
 	// Dependencies.
-	KubernetesClient *kubernetes.Clientset
-	Logger           micrologger.Logger
+	K8sClient kubernetes.Interface
+	Logger    micrologger.Logger
 }
 
 // DefaultConfig provides a default configuration to create a new updater
@@ -25,25 +25,25 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		// Dependencies.
-		KubernetesClient: nil,
-		Logger:           nil,
+		K8sClient: nil,
+		Logger:    nil,
 	}
 }
 
 // New creates a new updater.
 func New(config Config) (*Updater, error) {
 	// Dependencies.
-	if config.KubernetesClient == nil {
-		return nil, microerror.MaskAnyf(invalidConfigError, "kubernetes client must not be empty")
+	if config.K8sClient == nil {
+		return nil, microerror.MaskAnyf(invalidConfigError, "config.K8sClient must not be empty")
 	}
 	if config.Logger == nil {
-		return nil, microerror.MaskAnyf(invalidConfigError, "logger must not be empty")
+		return nil, microerror.MaskAnyf(invalidConfigError, "config.Logger must not be empty")
 	}
 
 	newUpdater := &Updater{
 		// Dependencies.
-		kubernetesClient: config.KubernetesClient,
-		logger:           config.Logger,
+		k8sClient: config.K8sClient,
+		logger:    config.Logger,
 	}
 
 	return newUpdater, nil
@@ -51,13 +51,13 @@ func New(config Config) (*Updater, error) {
 
 type Updater struct {
 	// Dependencies.
-	kubernetesClient *kubernetes.Clientset
-	logger           micrologger.Logger
+	k8sClient kubernetes.Interface
+	logger    micrologger.Logger
 }
 
 func (p *Updater) Create(namespace, service string, podInfos []provider.PodInfo) error {
 	for _, pi := range podInfos {
-		s, err := p.kubernetesClient.Services(namespace).Get(service, metav1.GetOptions{})
+		s, err := p.k8sClient.Core().Services(namespace).Get(service, metav1.GetOptions{})
 		if err != nil {
 			return microerror.MaskAny(err)
 		}
@@ -81,7 +81,7 @@ func (p *Updater) Create(namespace, service string, podInfos []provider.PodInfo)
 			},
 		}
 
-		_, err = p.kubernetesClient.Endpoints(namespace).Create(endpoint)
+		_, err = p.k8sClient.Core().Endpoints(namespace).Create(endpoint)
 		if errors.IsAlreadyExists(err) {
 			// In case the endpoint we tried to create does already exist, we only
 			// need to append the IPs we got in podInfos.
@@ -98,7 +98,7 @@ func (p *Updater) Create(namespace, service string, podInfos []provider.PodInfo)
 }
 
 func (p *Updater) Delete(namespace, service string, podInfos []provider.PodInfo) error {
-	endpoints, err := p.kubernetesClient.Endpoints(namespace).List(metav1.ListOptions{})
+	endpoints, err := p.k8sClient.Core().Endpoints(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return microerror.MaskAny(err)
 	}
@@ -118,7 +118,7 @@ func (p *Updater) Delete(namespace, service string, podInfos []provider.PodInfo)
 			}
 		}
 
-		_, err = p.kubernetesClient.Endpoints(namespace).Update(&endpoints.Items[i])
+		_, err = p.k8sClient.Core().Endpoints(namespace).Update(&endpoints.Items[i])
 		if err != nil {
 			return microerror.MaskAny(err)
 		}
@@ -128,7 +128,7 @@ func (p *Updater) Delete(namespace, service string, podInfos []provider.PodInfo)
 }
 
 func (p *Updater) appendIPs(namespace, service string, podInfos []provider.PodInfo) error {
-	endpoints, err := p.kubernetesClient.Endpoints(namespace).List(metav1.ListOptions{})
+	endpoints, err := p.k8sClient.Core().Endpoints(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return microerror.MaskAny(err)
 	}
@@ -156,7 +156,7 @@ func (p *Updater) appendIPs(namespace, service string, podInfos []provider.PodIn
 			}
 		}
 
-		_, err = p.kubernetesClient.Endpoints(namespace).Update(&endpoints.Items[i])
+		_, err = p.k8sClient.Core().Endpoints(namespace).Update(&endpoints.Items[i])
 		if err != nil {
 			return microerror.MaskAny(err)
 		}

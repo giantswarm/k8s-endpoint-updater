@@ -3,19 +3,18 @@ package update
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-
 	"github.com/cenk/backoff"
 	microerror "github.com/giantswarm/microkit/error"
 	micrologger "github.com/giantswarm/microkit/logger"
+	"github.com/giantswarm/micrologger/microloggertest"
+	"github.com/giantswarm/operatorkit/client/k8s"
 	"github.com/spf13/cobra"
+	"k8s.io/client-go/kubernetes"
 
 	"github.com/giantswarm/k8s-endpoint-updater/command/update/flag"
 	"github.com/giantswarm/k8s-endpoint-updater/service/provider"
@@ -115,6 +114,23 @@ func (c *Command) Execute(cmd *cobra.Command, args []string) {
 func (c *Command) execute() error {
 	var err error
 
+	var k8sClient kubernetes.Interface
+	{
+		k8sConfig := k8s.DefaultConfig()
+
+		k8sConfig.Address = f.Kubernetes.Address
+		k8sConfig.Logger = microloggertest.New()
+		k8sConfig.InCluster = f.Kubernetes.InCluster
+		k8sConfig.TLS.CAFile = f.Kubernetes.TLS.CaFile
+		k8sConfig.TLS.CrtFile = f.Kubernetes.TLS.CrtFile
+		k8sConfig.TLS.KeyFile = f.Kubernetes.TLS.KeyFile
+
+		k8sClient, err = k8s.NewClient(k8sConfig)
+		if err != nil {
+			return microerror.MaskAny(err)
+		}
+	}
+
 	// At first we have to sort out which provider to use. This is based on the
 	// flags given to the updater.
 	var newProvider provider.Provider
@@ -135,53 +151,11 @@ func (c *Command) execute() error {
 	// endpoints.
 	var newUpdater *updater.Updater
 	{
-		var kubernetesClient *kubernetes.Clientset
-		{
-			var restConfig *rest.Config
-
-			if f.Kubernetes.InCluster {
-				c.logger.Log("debug", "creating in-cluster config")
-				restConfig, err = rest.InClusterConfig()
-				if err != nil {
-					return microerror.MaskAny(err)
-				}
-
-				if f.Kubernetes.Address != "" {
-					c.logger.Log("debug", "using explicit api server")
-					restConfig.Host = f.Kubernetes.Address
-				}
-			} else {
-				if f.Kubernetes.Address == "" {
-					return microerror.MaskAnyf(invalidConfigError, "kubernetes address must not be empty")
-				}
-
-				c.logger.Log("debug", "creating out-cluster config")
-
-				// Kubernetes listen URL.
-				u, err := url.Parse(f.Kubernetes.Address)
-				if err != nil {
-					return microerror.MaskAny(err)
-				}
-
-				restConfig = &rest.Config{
-					Host: u.String(),
-					TLSClientConfig: rest.TLSClientConfig{
-						CAFile:   f.Kubernetes.TLS.CaFile,
-						CertFile: f.Kubernetes.TLS.CrtFile,
-						KeyFile:  f.Kubernetes.TLS.KeyFile,
-					},
-				}
-			}
-
-			kubernetesClient, err = kubernetes.NewForConfig(restConfig)
-			if err != nil {
-				return microerror.MaskAny(err)
-			}
-		}
-
 		updaterConfig := updater.DefaultConfig()
-		updaterConfig.KubernetesClient = kubernetesClient
+
+		updaterConfig.K8sClient = k8sClient
 		updaterConfig.Logger = c.logger
+
 		newUpdater, err = updater.New(updaterConfig)
 		if err != nil {
 			return microerror.MaskAny(err)
