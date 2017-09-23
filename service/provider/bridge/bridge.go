@@ -2,7 +2,6 @@ package bridge
 
 import (
 	"errors"
-	"fmt"
 	"net"
 
 	microerror "github.com/giantswarm/microkit/error"
@@ -78,16 +77,12 @@ func (p *Provider) Lookup() ([]provider.PodInfo, error) {
 		return nil, microerror.MaskAny(err)
 	}
 
-	fmt.Printf("netInterface: %#v\n", netInterface)
-
 	// The interface addresses have to be parsed to find the actual IPV4 we are
 	// interested in.
 	ip, err := ipv4FromInterface(netInterface)
 	if err != nil {
 		return nil, microerror.MaskAny(err)
 	}
-
-	fmt.Printf("ip: %s\n", ip)
 
 	// The bridge provider lookup assumes some aspects of our setup. The following
 	// explains why we need to increment the bridge IP.
@@ -129,10 +124,8 @@ func ipv4FromInterface(netInterface *net.Interface) (net.IP, error) {
 	if err != nil {
 		return nil, microerror.MaskAny(err)
 	}
-	fmt.Printf("addrs: %#v\n", addrs)
 	for _, addr := range addrs {
 		var ip net.IP
-		fmt.Printf("addr: %s\n", addr)
 
 		switch v := addr.(type) {
 		case *net.IPNet:
@@ -142,14 +135,11 @@ func ipv4FromInterface(netInterface *net.Interface) (net.IP, error) {
 		}
 
 		if ip == nil {
-			fmt.Printf("ip nil\n")
 			continue
 		}
-		fmt.Printf("ip: %s\n", ip)
 
 		ipv4 := ip.To4()
 		if ipv4 == nil {
-			fmt.Printf("ip v4 nil\n")
 			// Not an ipv4 address.
 			continue
 		}

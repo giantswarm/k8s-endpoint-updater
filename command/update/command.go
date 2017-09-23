@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/cenk/backoff"
 	microerror "github.com/giantswarm/microkit/error"
@@ -175,11 +174,7 @@ func (c *Command) execute() error {
 			return nil
 		}
 
-		notifier := func(err error, d time.Duration) {
-			fmt.Printf("%#v\n", err)
-		}
-
-		err := backoff.RetryNotify(action, backoff.NewExponentialBackOff(), notifier)
+		err := backoff.Retry(action, backoff.NewExponentialBackOff())
 		if err != nil {
 			return microerror.MaskAny(err)
 		}
@@ -213,12 +208,11 @@ func (c *Command) execute() error {
 	listener := make(chan os.Signal, 2)
 	signal.Notify(listener, syscall.SIGTERM, syscall.SIGKILL)
 
-	fmt.Printf("bridge name : %#v\n", f.Provider.Bridge.Name)
-	fmt.Printf("waiting for termination signals\n")
+	c.logger.Log("debug", "waiting for termination signal")
 
-	s1 := <-listener
+	s := <-listener
 
-	fmt.Printf("received termination signal: %#v (%s)\n", s1, s1)
+	c.logger.Log("debug", fmt.Sprintf("received termination signal: %#v (%s)\n", s, s))
 
 	// Use the updater to actually delete the endpoints identified by the provided
 	// flags.
@@ -238,12 +232,15 @@ func (c *Command) execute() error {
 			os.Exit(1)
 		}
 
-		c.logger.Log("debug", fmt.Sprintf("removed IPs from endpoint of service '%s'", f.Kubernetes.Cluster.Service))
+		c.logger.Log("debug", fmt.Sprintf("removed IP from endpoint of service '%s'", f.Kubernetes.Cluster.Service))
+		c.logger.Log("debug", "shutting down with exit code 0")
 
 		os.Exit(0)
 	}()
 
 	<-listener
+
+	c.logger.Log("debug", "shutting down with exit code 0")
 
 	os.Exit(0)
 
