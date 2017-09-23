@@ -140,8 +140,10 @@ func ipv4FromInterface(netInterface *net.Interface) (net.IP, error) {
 	if err != nil {
 		return nil, microerror.MaskAny(err)
 	}
+	fmt.Printf("addrs: %#v\n", addrs)
 	for _, addr := range addrs {
 		var ip net.IP
+		fmt.Printf("addr: %#v\n", addr)
 
 		switch v := addr.(type) {
 		case *net.IPNet:
@@ -151,11 +153,14 @@ func ipv4FromInterface(netInterface *net.Interface) (net.IP, error) {
 		}
 
 		if ip == nil {
+			fmt.Printf("ip nil\n")
 			continue
 		}
+		fmt.Printf("ip: %#v\n", ip)
 
 		ipv4 := ip.To4()
 		if ipv4 == nil {
+			fmt.Printf("ip v4 nil\n")
 			// Not an ipv4 address.
 			continue
 		}
