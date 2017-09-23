@@ -206,7 +206,7 @@ func (c *Command) execute() error {
 			return microerror.MaskAny(err)
 		}
 
-		c.logger.Log("debug", fmt.Sprintf("added IPs to endpoint of service '%s'", f.Kubernetes.Cluster.Service))
+		c.logger.Log("debug", fmt.Sprintf("added IP to endpoint of service '%s'", f.Kubernetes.Cluster.Service))
 	}
 
 	// Listen to OS signals issued by the Kubernetes scheduler.
