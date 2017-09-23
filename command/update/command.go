@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -139,6 +140,9 @@ func (c *Command) execute() error {
 			if err != nil {
 				return microerror.MaskAny(err)
 			}
+
+			fmt.Printf("podName: %#v\n", podName)
+			fmt.Printf("bridge name : %#v\n", f.Provider.Bridge.Name)
 		case env.Kind:
 			envConfig := env.DefaultConfig()
 			envConfig.Logger = c.logger
@@ -244,7 +248,11 @@ func (c *Command) execute() error {
 			return nil
 		}
 
-		err := backoff.Retry(action, backoff.NewExponentialBackOff())
+		notifier := func(err error, d time.Duration) {
+			fmt.Printf("%#v\n", err)
+		}
+
+		err := backoff.RetryNotify(action, backoff.NewExponentialBackOff(), notifier)
 		if err != nil {
 			return microerror.MaskAny(err)
 		}
