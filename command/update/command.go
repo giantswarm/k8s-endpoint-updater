@@ -15,14 +15,11 @@ import (
 	"github.com/cenk/backoff"
 	microerror "github.com/giantswarm/microkit/error"
 	micrologger "github.com/giantswarm/microkit/logger"
-	microstorage "github.com/giantswarm/microkit/storage"
 	"github.com/spf13/cobra"
 
 	"github.com/giantswarm/k8s-endpoint-updater/command/update/flag"
 	"github.com/giantswarm/k8s-endpoint-updater/service/provider"
 	"github.com/giantswarm/k8s-endpoint-updater/service/provider/bridge"
-	"github.com/giantswarm/k8s-endpoint-updater/service/provider/env"
-	"github.com/giantswarm/k8s-endpoint-updater/service/provider/etcd"
 	"github.com/giantswarm/k8s-endpoint-updater/service/updater"
 )
 
@@ -122,49 +119,15 @@ func (c *Command) execute() error {
 	// flags given to the updater.
 	var newProvider provider.Provider
 	{
-		k := f.Provider.Kind
-		switch k {
-		case bridge.Kind:
-			bridgeConfig := bridge.DefaultConfig()
+		bridgeConfig := bridge.DefaultConfig()
 
-			bridgeConfig.Logger = c.logger
+		bridgeConfig.Logger = c.logger
 
-			bridgeConfig.BridgeName = f.Provider.Bridge.Name
+		bridgeConfig.BridgeName = f.Provider.Bridge.Name
 
-			newProvider, err = bridge.New(bridgeConfig)
-			if err != nil {
-				return microerror.MaskAny(err)
-			}
-		case env.Kind:
-			envConfig := env.DefaultConfig()
-			envConfig.Logger = c.logger
-			envConfig.Prefix = f.Provider.Env.Prefix
-			newProvider, err = env.New(envConfig)
-			if err != nil {
-				return microerror.MaskAny(err)
-			}
-		case etcd.Kind:
-			var storageService microstorage.Service
-			{
-				storageConfig := microstorage.DefaultConfig()
-				storageConfig.EtcdAddress = f.Provider.Etcd.Address
-				storageConfig.EtcdPrefix = f.Provider.Etcd.Prefix
-				storageConfig.Kind = f.Provider.Etcd.Kind
-				storageService, err = microstorage.New(storageConfig)
-				if err != nil {
-					return microerror.MaskAny(err)
-				}
-			}
-
-			etcdConfig := etcd.DefaultConfig()
-			etcdConfig.Logger = c.logger
-			etcdConfig.Storage = storageService
-			newProvider, err = etcd.New(etcdConfig)
-			if err != nil {
-				return microerror.MaskAny(err)
-			}
-		default:
-			return microerror.MaskAnyf(invalidConfigError, "unsupported provider kind '%s'", k)
+		newProvider, err = bridge.New(bridgeConfig)
+		if err != nil {
+			return microerror.MaskAny(err)
 		}
 	}
 
