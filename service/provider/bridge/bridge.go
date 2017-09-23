@@ -25,10 +25,6 @@ type Config struct {
 	// BridgeName is the bridge name of the underlying host used to lookup the endpoint
 	// IP.
 	BridgeName string
-	// PodName is the name of the pod the endpoint updater is running in. This can
-	// only be one pod because of the design of the bridge provider, because it
-	// can only run inside one pod at a time.
-	PodName string
 }
 
 // DefaultConfig provides a default configuration to create a new provider
@@ -40,7 +36,6 @@ func DefaultConfig() Config {
 
 		// Settings.
 		BridgeName: "",
-		PodName:    "",
 	}
 }
 
@@ -55,9 +50,6 @@ func New(config Config) (*Provider, error) {
 	if config.BridgeName == "" {
 		return nil, microerror.MaskAnyf(invalidConfigError, "config.BridgeName must not be empty")
 	}
-	if config.PodName == "" {
-		return nil, microerror.MaskAnyf(invalidConfigError, "config.PodName must not be empty")
-	}
 
 	newProvider := &Provider{
 		// Dependencies.
@@ -65,7 +57,6 @@ func New(config Config) (*Provider, error) {
 
 		// Settings.
 		bridgeName: config.BridgeName,
-		podName:    config.PodName,
 	}
 
 	return newProvider, nil
@@ -77,7 +68,6 @@ type Provider struct {
 
 	// Settings.
 	bridgeName string
-	podName    string
 }
 
 func (p *Provider) Lookup() ([]provider.PodInfo, error) {
@@ -97,7 +87,7 @@ func (p *Provider) Lookup() ([]provider.PodInfo, error) {
 		return nil, microerror.MaskAny(err)
 	}
 
-	fmt.Printf("ip: %#v\n", ip)
+	fmt.Printf("ip: %s\n", ip)
 
 	// The bridge provider lookup assumes some aspects of our setup. The following
 	// explains why we need to increment the bridge IP.
@@ -114,8 +104,7 @@ func (p *Provider) Lookup() ([]provider.PodInfo, error) {
 	// running on.
 	podInfos := []provider.PodInfo{
 		{
-			IP:   next,
-			Name: p.podName,
+			IP: next,
 		},
 	}
 
@@ -143,7 +132,7 @@ func ipv4FromInterface(netInterface *net.Interface) (net.IP, error) {
 	fmt.Printf("addrs: %#v\n", addrs)
 	for _, addr := range addrs {
 		var ip net.IP
-		fmt.Printf("addr: %#v\n", addr)
+		fmt.Printf("addr: %s\n", addr)
 
 		switch v := addr.(type) {
 		case *net.IPNet:
@@ -156,7 +145,7 @@ func ipv4FromInterface(netInterface *net.Interface) (net.IP, error) {
 			fmt.Printf("ip nil\n")
 			continue
 		}
-		fmt.Printf("ip: %#v\n", ip)
+		fmt.Printf("ip: %s\n", ip)
 
 		ipv4 := ip.To4()
 		if ipv4 == nil {

@@ -82,8 +82,6 @@ func New(config Config) (*Command, error) {
 	newCommand.cobraCommand.PersistentFlags().StringVar(&f.Provider.Etcd.Prefix, "provider.etcd.prefix", "", "Prefix of etcd paths providing pod names.")
 	newCommand.cobraCommand.PersistentFlags().StringVar(&f.Provider.Kind, "provider.kind", "env", "Provider used to lookup pod IPs.")
 
-	newCommand.cobraCommand.PersistentFlags().StringSliceVar(&f.Updater.Pod.Names, "updater.pod.names", nil, "List of pod names used to lookup pod IPs.")
-
 	return newCommand, nil
 }
 
@@ -127,26 +125,19 @@ func (c *Command) execute() error {
 		k := f.Provider.Kind
 		switch k {
 		case bridge.Kind:
-			if len(f.Updater.Pod.Names) != 1 {
-				return microerror.MaskAnyf(invalidConfigError, "bridge provider expects 1 pod name")
-			}
-			podName := f.Updater.Pod.Names[0]
-
 			bridgeConfig := bridge.DefaultConfig()
-			bridgeConfig.BridgeName = f.Provider.Bridge.Name
+
 			bridgeConfig.Logger = c.logger
-			bridgeConfig.PodName = podName
+
+			bridgeConfig.BridgeName = f.Provider.Bridge.Name
+
 			newProvider, err = bridge.New(bridgeConfig)
 			if err != nil {
 				return microerror.MaskAny(err)
 			}
-
-			fmt.Printf("podName: %#v\n", podName)
-			fmt.Printf("bridge name : %#v\n", f.Provider.Bridge.Name)
 		case env.Kind:
 			envConfig := env.DefaultConfig()
 			envConfig.Logger = c.logger
-			envConfig.PodNames = f.Updater.Pod.Names
 			envConfig.Prefix = f.Provider.Env.Prefix
 			newProvider, err = env.New(envConfig)
 			if err != nil {
@@ -167,7 +158,6 @@ func (c *Command) execute() error {
 
 			etcdConfig := etcd.DefaultConfig()
 			etcdConfig.Logger = c.logger
-			etcdConfig.PodNames = f.Updater.Pod.Names
 			etcdConfig.Storage = storageService
 			newProvider, err = etcd.New(etcdConfig)
 			if err != nil {
@@ -258,7 +248,7 @@ func (c *Command) execute() error {
 		}
 
 		for _, pi := range podInfos {
-			c.logger.Log("debug", fmt.Sprintf("found pod info of service '%s'", f.Kubernetes.Cluster.Service), "IP", pi.IP.String(), "pod", pi.Name)
+			c.logger.Log("debug", fmt.Sprintf("found pod info of service '%s'", f.Kubernetes.Cluster.Service), "ip", pi.IP.String())
 		}
 	}
 
@@ -286,7 +276,12 @@ func (c *Command) execute() error {
 	listener := make(chan os.Signal, 2)
 	signal.Notify(listener, syscall.SIGTERM, syscall.SIGKILL)
 
-	<-listener
+	fmt.Printf("bridge name : %#v\n", f.Provider.Bridge.Name)
+	fmt.Printf("waiting for termination signals\n")
+
+	s1 := <-listener
+
+	fmt.Printf("received termination signal: %#v (%s)\n", s1, s1)
 
 	// Use the updater to actually delete the endpoints identified by the provided
 	// flags.

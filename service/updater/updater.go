@@ -189,16 +189,6 @@ func removeIPFromAddresses(addresses []apiv1.EndpointAddress, IP net.IP) []apiv1
 	return newAddresses
 }
 
-func podInfoByName(podInfos []provider.PodInfo, name string) (provider.PodInfo, error) {
-	for _, pi := range podInfos {
-		if pi.Name == name {
-			return pi, nil
-		}
-	}
-
-	return provider.PodInfo{}, microerror.MaskAnyf(executionFailedError, "pod info for name '%s' not found", name)
-}
-
 func serviceToPorts(s *apiv1.Service) []apiv1.EndpointPort {
 	var ports []apiv1.EndpointPort
 
