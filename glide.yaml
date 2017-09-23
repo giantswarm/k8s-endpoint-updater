@@ -4,9 +4,11 @@ import:
   subpackages:
   - error
   - logger
+- package: github.com/giantswarm/operatorkit
+  version: 99012acc738213a8ad0f2ff2c07146940d5af441
+- package: github.com/cenk/backoff
+  version: ~1.0.0
 - package: github.com/juju/errgo
 - package: github.com/spf13/cobra
 - package: github.com/golang/protobuf
   version: 8ee79997227bf9b34611aee7946ae64735e6fd93
-- package: github.com/cenk/backoff
-  version: ~1.0.0
