@@ -1,6 +1,7 @@
 package retryresource
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -9,9 +10,10 @@ import (
 	"github.com/giantswarm/operatorkit/framework"
 )
 
-// Test_RetryResource_ProcessCreate_ResourceOrder_Retry ensures the resource's
-// methods are executed as expected when retrying the creation process.
-func Test_RetryResource_ProcessCreate_ResourceOrder_Retry(t *testing.T) {
+// Test_RetryResource_ProcessCreate_ResourceOrder_RetryOnError ensures the
+// resource's methods are executed as expected when retrying the creation
+// process.
+func Test_RetryResource_ProcessCreate_ResourceOrder_RetryOnError(t *testing.T) {
 	testCases := []struct {
 		ErrorCount          int
 		ErrorMethod         string
@@ -74,7 +76,7 @@ func Test_RetryResource_ProcessCreate_ResourceOrder_Retry(t *testing.T) {
 			t.Fatal("test", i+1, "expected", nil, "got", err)
 		}
 
-		err = testMustNewFramework(t).ProcessCreate(nil, wrapped)
+		err = framework.ProcessCreate(context.TODO(), nil, wrapped)
 		if err != nil {
 			t.Fatal("test", i+1, "expected", nil, "got", err)
 		}
@@ -85,10 +87,10 @@ func Test_RetryResource_ProcessCreate_ResourceOrder_Retry(t *testing.T) {
 	}
 }
 
-// Test_RetryResource_ProcessCreate_ResourceOrder_RetryResource ensures the
-// resource's methods are executed as expected when creating resources using the
-// wrapping retry resource.
-func Test_RetryResource_ProcessCreate_ResourceOrder_RetryResource(t *testing.T) {
+// Test_RetryResource_ProcessCreate_ResourceOrder ensures the resource's methods
+// are executed as expected when creating resources using the wrapping retry
+// resource.
+func Test_RetryResource_ProcessCreate_ResourceOrder(t *testing.T) {
 	tr := &testResource{}
 	rs := []framework.Resource{
 		tr,
@@ -104,7 +106,7 @@ func Test_RetryResource_ProcessCreate_ResourceOrder_RetryResource(t *testing.T) 
 		t.Fatal("expected", nil, "got", err)
 	}
 
-	err = testMustNewFramework(t).ProcessCreate(nil, wrapped)
+	err = framework.ProcessCreate(context.TODO(), nil, wrapped)
 	if err != nil {
 		t.Fatal("expected", nil, "got", err)
 	}
@@ -120,9 +122,10 @@ func Test_RetryResource_ProcessCreate_ResourceOrder_RetryResource(t *testing.T) 
 	}
 }
 
-// Test_Operator_ProcessDelete_ResourceOrder_Retry ensures the resource's
-// methods are executed as expected when retrying the deletion process.
-func Test_Operator_ProcessDelete_ResourceOrder_Retry(t *testing.T) {
+// Test_RetryResource_ProcessDelete_ResourceOrder_RetryOnError ensures the
+// resource's methods are executed as expected when retrying the deletion
+// process.
+func Test_RetryResource_ProcessDelete_ResourceOrder_RetryOnError(t *testing.T) {
 	testCases := []struct {
 		ErrorCount          int
 		ErrorMethod         string
@@ -185,7 +188,7 @@ func Test_Operator_ProcessDelete_ResourceOrder_Retry(t *testing.T) {
 			t.Fatal("test", i+1, "expected", nil, "got", err)
 		}
 
-		err = testMustNewFramework(t).ProcessDelete(nil, wrapped)
+		err = framework.ProcessDelete(context.TODO(), nil, wrapped)
 		if err != nil {
 			t.Fatal("test", i+1, "expected", nil, "got", err)
 		}
@@ -196,10 +199,10 @@ func Test_Operator_ProcessDelete_ResourceOrder_Retry(t *testing.T) {
 	}
 }
 
-// Test_Operator_ProcessDelete_ResourceOrder_RetryResource ensures the
-// resource's methods are executed as expected when deleting resources using the
-// wrapping retry resource.
-func Test_Operator_ProcessDelete_ResourceOrder_RetryResource(t *testing.T) {
+// Test_RetryResource_ProcessDelete_ResourceOrder ensures the resource's methods
+// are executed as expected when deleting resources using the wrapping retry
+// resource.
+func Test_RetryResource_ProcessDelete_ResourceOrder(t *testing.T) {
 	tr := &testResource{}
 	rs := []framework.Resource{
 		tr,
@@ -215,7 +218,7 @@ func Test_Operator_ProcessDelete_ResourceOrder_RetryResource(t *testing.T) {
 		t.Fatal("expected", nil, "got", err)
 	}
 
-	err = testMustNewFramework(t).ProcessDelete(nil, wrapped)
+	err = framework.ProcessDelete(context.TODO(), nil, wrapped)
 	if err != nil {
 		t.Fatal("expected", nil, "got", err)
 	}
@@ -231,14 +234,124 @@ func Test_Operator_ProcessDelete_ResourceOrder_RetryResource(t *testing.T) {
 	}
 }
 
-func testMustNewFramework(t *testing.T) *framework.Framework {
-	frameworkConfig := framework.DefaultConfig()
-	newFramework, err := framework.New(frameworkConfig)
+// Test_RetryResource_ProcessUpdate_ResourceOrder_RetryOnError ensures the
+// resource's methods are executed as expected when retrying the update
+// process.
+func Test_RetryResource_ProcessUpdate_ResourceOrder_RetryOnError(t *testing.T) {
+	testCases := []struct {
+		ErrorCount          int
+		ErrorMethod         string
+		ExpectedMethodOrder []string
+	}{
+		{
+			ErrorCount:  1,
+			ErrorMethod: "GetCurrentState",
+			ExpectedMethodOrder: []string{
+				"GetCurrentState",
+				"GetCurrentState",
+				"GetDesiredState",
+				"GetUpdateState",
+				"ProcessCreateState",
+				"ProcessDeleteState",
+				"ProcessUpdateState",
+			},
+		},
+		{
+			ErrorCount:  2,
+			ErrorMethod: "GetCurrentState",
+			ExpectedMethodOrder: []string{
+				"GetCurrentState",
+				"GetCurrentState",
+				"GetCurrentState",
+				"GetDesiredState",
+				"GetUpdateState",
+				"ProcessCreateState",
+				"ProcessDeleteState",
+				"ProcessUpdateState",
+			},
+		},
+		{
+			ErrorCount:  2,
+			ErrorMethod: "ProcessUpdateState",
+			ExpectedMethodOrder: []string{
+				"GetCurrentState",
+				"GetDesiredState",
+				"GetUpdateState",
+				"ProcessCreateState",
+				"ProcessDeleteState",
+				"ProcessUpdateState",
+				"ProcessUpdateState",
+				"ProcessUpdateState",
+			},
+		},
+	}
+
+	for i, tc := range testCases {
+		tr := &testResource{
+			Error:       fmt.Errorf("test error"),
+			ErrorCount:  tc.ErrorCount,
+			ErrorMethod: tc.ErrorMethod,
+		}
+		rs := []framework.Resource{
+			tr,
+		}
+		bf := func() backoff.BackOff {
+			return &backoff.ZeroBackOff{}
+		}
+
+		config := DefaultWrapConfig()
+		config.BackOffFactory = bf
+		wrapped, err := Wrap(rs, config)
+		if err != nil {
+			t.Fatal("test", i+1, "expected", nil, "got", err)
+		}
+
+		err = framework.ProcessUpdate(context.TODO(), nil, wrapped)
+		if err != nil {
+			t.Fatal("test", i+1, "expected", nil, "got", err)
+		}
+
+		if !reflect.DeepEqual(tc.ExpectedMethodOrder, tr.Order) {
+			t.Fatal("test", i+1, "expected", tc.ExpectedMethodOrder, "got", tr.Order)
+		}
+	}
+}
+
+// Test_RetryResource_ProcessUpdate_ResourceOrder ensures the resource's methods
+// are executed as expected when updating resources using the wrapping retry
+// resource.
+func Test_RetryResource_ProcessUpdate_ResourceOrder(t *testing.T) {
+	tr := &testResource{}
+	rs := []framework.Resource{
+		tr,
+	}
+	bf := func() backoff.BackOff {
+		return &backoff.ZeroBackOff{}
+	}
+
+	config := DefaultWrapConfig()
+	config.BackOffFactory = bf
+	wrapped, err := Wrap(rs, config)
 	if err != nil {
 		t.Fatal("expected", nil, "got", err)
 	}
 
-	return newFramework
+	err = framework.ProcessUpdate(context.TODO(), nil, wrapped)
+	if err != nil {
+		t.Fatal("expected", nil, "got", err)
+	}
+
+	e := []string{
+		"GetCurrentState",
+		"GetDesiredState",
+		"GetUpdateState",
+		"ProcessCreateState",
+		"ProcessDeleteState",
+		"ProcessUpdateState",
+	}
+	if !reflect.DeepEqual(e, tr.Order) {
+		t.Fatal("expected", e, "got", tr.Order)
+	}
 }
 
 type testResource struct {
@@ -250,7 +363,7 @@ type testResource struct {
 	errorCount int
 }
 
-func (r *testResource) GetCurrentState(obj interface{}) (interface{}, error) {
+func (r *testResource) GetCurrentState(ctx context.Context, obj interface{}) (interface{}, error) {
 	m := "GetCurrentState"
 	r.Order = append(r.Order, m)
 
@@ -261,7 +374,7 @@ func (r *testResource) GetCurrentState(obj interface{}) (interface{}, error) {
 	return nil, nil
 }
 
-func (r *testResource) GetDesiredState(obj interface{}) (interface{}, error) {
+func (r *testResource) GetDesiredState(ctx context.Context, obj interface{}) (interface{}, error) {
 	m := "GetDesiredState"
 	r.Order = append(r.Order, m)
 
@@ -272,7 +385,7 @@ func (r *testResource) GetDesiredState(obj interface{}) (interface{}, error) {
 	return nil, nil
 }
 
-func (r *testResource) GetCreateState(obj, currentState, desiredState interface{}) (interface{}, error) {
+func (r *testResource) GetCreateState(ctx context.Context, obj, currentState, desiredState interface{}) (interface{}, error) {
 	m := "GetCreateState"
 	r.Order = append(r.Order, m)
 
@@ -283,7 +396,7 @@ func (r *testResource) GetCreateState(obj, currentState, desiredState interface{
 	return nil, nil
 }
 
-func (r *testResource) GetDeleteState(obj, currentState, desiredState interface{}) (interface{}, error) {
+func (r *testResource) GetDeleteState(ctx context.Context, obj, currentState, desiredState interface{}) (interface{}, error) {
 	m := "GetDeleteState"
 	r.Order = append(r.Order, m)
 
@@ -294,7 +407,22 @@ func (r *testResource) GetDeleteState(obj, currentState, desiredState interface{
 	return nil, nil
 }
 
-func (r *testResource) ProcessCreateState(obj, createState interface{}) error {
+func (r *testResource) GetUpdateState(ctx context.Context, obj, currentState, desiredState interface{}) (interface{}, interface{}, interface{}, error) {
+	m := "GetUpdateState"
+	r.Order = append(r.Order, m)
+
+	if r.returnErrorFor(m) {
+		return nil, nil, nil, r.Error
+	}
+
+	return nil, nil, nil, nil
+}
+
+func (r *testResource) Name() string {
+	return "testResource"
+}
+
+func (r *testResource) ProcessCreateState(ctx context.Context, obj, createState interface{}) error {
 	m := "ProcessCreateState"
 	r.Order = append(r.Order, m)
 
@@ -305,12 +433,19 @@ func (r *testResource) ProcessCreateState(obj, createState interface{}) error {
 	return nil
 }
 
-func (r *testResource) Name() string {
-	return "testResource"
+func (r *testResource) ProcessDeleteState(ctx context.Context, obj, deleteState interface{}) error {
+	m := "ProcessDeleteState"
+	r.Order = append(r.Order, m)
+
+	if r.returnErrorFor(m) {
+		return r.Error
+	}
+
+	return nil
 }
 
-func (r *testResource) ProcessDeleteState(obj, deleteState interface{}) error {
-	m := "ProcessDeleteState"
+func (r *testResource) ProcessUpdateState(ctx context.Context, obj, updateState interface{}) error {
+	m := "ProcessUpdateState"
 	r.Order = append(r.Order, m)
 
 	if r.returnErrorFor(m) {

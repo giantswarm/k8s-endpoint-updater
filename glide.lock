@@ -1,5 +1,5 @@
-hash: df93eb298f282b5d1df6fd972426b95203381f192771068682617a79b74fb363
-updated: 2017-09-23T19:30:39.224492691+02:00
+hash: efce1c2e5796bccea74b3be4a8efec4b38515218fbd21b1d0e1261ec22f676dd
+updated: 2017-09-24T22:14:55.910473494+02:00
 imports:
 - name: github.com/cenk/backoff
   version: 32cd0c5b3aef12c76ed64aaf678f6c79736be7dc
@@ -50,8 +50,10 @@ imports:
   - tls
 - name: github.com/giantswarm/micrologger
   version: 8a69b2ab80ba2d0bd40d609206518fefacfc8fdf
+  subpackages:
+  - microloggertest
 - name: github.com/giantswarm/operatorkit
-  version: 99012acc738213a8ad0f2ff2c07146940d5af441
+  version: a6f6c824a13e17d683ff951edb2439238eaace37
   subpackages:
   - client/k8s
 - name: github.com/go-kit/kit
