@@ -130,8 +130,6 @@ func (c *Command) execute() error {
 		}
 	}
 
-	// At first we have to sort out which provider to use. This is based on the
-	// flags given to the updater.
 	var newProvider provider.Provider
 	{
 		bridgeConfig := bridge.DefaultConfig()
@@ -146,8 +144,7 @@ func (c *Command) execute() error {
 		}
 	}
 
-	// We also need to create the updater which is able to update Kubernetes
-	// endpoints.
+	// We need to create the updater which is able to update Kubernetes endpoints.
 	var newUpdater *updater.Updater
 	{
 		updaterConfig := updater.DefaultConfig()
@@ -161,8 +158,7 @@ func (c *Command) execute() error {
 		}
 	}
 
-	// Once we know which provider to use we execute it to lookup the pod
-	// information we are interested in.
+	// Here we lookup the VM IP we are interested in.
 	var podInfos []provider.PodInfo
 	{
 		action := func() error {
