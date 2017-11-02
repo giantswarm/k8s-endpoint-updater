@@ -182,7 +182,6 @@ func (c *Command) execute() error {
 	// Use the updater to actually add annotations to the kvm pod.
 	{
 		action := func() error {
-			c.logger.Log("debug", "adding anotations")
 			err := newUpdater.AddAnnotations(f.Kubernetes.Cluster.Namespace, f.Kubernetes.Cluster.Service, f.Kubernetes.Pod.Name, podIP)
 			if err != nil {
 				return microerror.Mask(err)
