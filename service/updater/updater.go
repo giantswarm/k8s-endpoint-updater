@@ -11,8 +11,7 @@ import (
 )
 
 const (
-	annotationIp      = "endpoint.kvm.giantswarm.io/ip"
-	annotationService = "endpoint.kvm.giantswarm.io/service"
+	annotationIp = "endpoint.kvm.giantswarm.io/ip"
 )
 
 // Config represents the configuration used to create a new updater.
@@ -66,7 +65,6 @@ func (p *Updater) AddAnnotations(namespace, service string, podName string, podI
 	}
 
 	kvmPod.Annotations[annotationIp] = podIP.String()
-	kvmPod.Annotations[annotationService] = service
 
 	_, err = p.k8sClient.CoreV1().Pods(namespace).Update(kvmPod)
 
