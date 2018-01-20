@@ -66,8 +66,9 @@ func (p *Updater) AddAnnotations(namespace, service string, podName string, podI
 	}
 
 	patch := fmt.Sprintf("{'metadata':{'annotations': {'endpoint.kvm.giantswarm.io/ip':'%s'}}}", podIP.String())
+	fmt.Printf("patch: {'metadata':{'annotations': {'endpoint.kvm.giantswarm.io/ip':'%s'}}}", podIP.String())
 
-	_, err = p.k8sClient.CoreV1().Pods(namespace).Patch(kvmPod.Name, types.MergePatchType, []byte(patch))
+	_, err = p.k8sClient.CoreV1().Pods(namespace).Patch(kvmPod.Name, types.StrategicMergePatchType, []byte(patch))
 	if err != nil {
 		p.logger.Log("error", fmt.Sprintf("Updating pod annotation failed: %#v.", err))
 		return microerror.Mask(err)
