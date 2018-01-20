@@ -7,6 +7,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"fmt"
+	"k8s.io/apimachinery/pkg/types"
 	"net"
 )
 
@@ -64,10 +65,9 @@ func (p *Updater) AddAnnotations(namespace, service string, podName string, podI
 		return microerror.Mask(err)
 	}
 
-	kvmPod.Annotations[annotationIp] = podIP.String()
+	patch := fmt.Sprintf("{'metadata':{'annotations': {'endpoint.kvm.giantswarm.io/ip':'%s'}}}", podIP.String())
 
-	_, err = p.k8sClient.CoreV1().Pods(namespace).Update(kvmPod)
-
+	_, err = p.k8sClient.CoreV1().Pods(namespace).Patch(kvmPod.Name, types.MergePatchType, []byte(patch))
 	if err != nil {
 		p.logger.Log("error", fmt.Sprintf("Updating pod annotation failed: %#v.", err))
 		return microerror.Mask(err)
