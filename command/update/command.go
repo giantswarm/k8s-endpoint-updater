@@ -19,6 +19,10 @@ import (
 	"net"
 )
 
+const (
+	podNameEnv = "POD_NAME"
+)
+
 var (
 	f = &flag.Flag{}
 )
@@ -67,7 +71,6 @@ func New(config Config) (*Command, error) {
 	newCommand.CobraCommand().PersistentFlags().StringVar(&f.Kubernetes.TLS.CaFile, "service.kubernetes.tls.caFile", "", "Certificate authority file path to use to authenticate with Kubernetes.")
 	newCommand.CobraCommand().PersistentFlags().StringVar(&f.Kubernetes.TLS.CrtFile, "service.kubernetes.tls.crtFile", "", "Certificate file path to use to authenticate with Kubernetes.")
 	newCommand.CobraCommand().PersistentFlags().StringVar(&f.Kubernetes.TLS.KeyFile, "service.kubernetes.tls.keyFile", "", "Key file path to use to authenticate with Kubernetes.")
-	newCommand.CobraCommand().PersistentFlags().StringVar(&f.Kubernetes.Pod.Name, "service.kubernetes.pod.name", "", "Name of the guest cluster kvm Kubernetes pod.")
 
 	newCommand.cobraCommand.PersistentFlags().StringVar(&f.Provider.Bridge.Name, "provider.bridge.name", "", "Bridge name of the guest cluster VM on the host network.")
 	newCommand.cobraCommand.PersistentFlags().StringVar(&f.Provider.Env.Prefix, "provider.env.prefix", "K8S_ENDPOINT_UPDATER_POD_", "Prefix of environment variables providing pod names.")
@@ -75,6 +78,11 @@ func New(config Config) (*Command, error) {
 	newCommand.cobraCommand.PersistentFlags().StringVar(&f.Provider.Etcd.Kind, "provider.etcd.kind", "etcdv2", "Etcd storage client version to use.")
 	newCommand.cobraCommand.PersistentFlags().StringVar(&f.Provider.Etcd.Prefix, "provider.etcd.prefix", "", "Prefix of etcd paths providing pod names.")
 	newCommand.cobraCommand.PersistentFlags().StringVar(&f.Provider.Kind, "provider.kind", "env", "Provider used to lookup pod IPs.")
+
+	f.Kubernetes.Pod.Name = os.Getenv(podNameEnv)
+	if f.Kubernetes.Pod.Name == "" {
+		return nil, microerror.Maskf(invalidConfigError, "POD_NAME env must not be empty")
+	}
 
 	return newCommand, nil
 }
