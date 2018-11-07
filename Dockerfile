@@ -1,4 +1,4 @@
-FROM busybox:ubuntu-14.04
+FROM alpine:3.8
 
 RUN mkdir -p /opt
 ADD ./k8s-endpoint-updater /opt/k8s-endpoint-updater
