@@ -96,11 +96,6 @@ func (c *Command) CobraCommand() *cobra.Command {
 }
 
 func (c *Command) Execute(cmd *cobra.Command, args []string) {
-	f.Kubernetes.Pod.Name = os.Getenv(podNameEnv)
-	if f.Kubernetes.Pod.Name == "" {
-		c.logger.Log("error", fmt.Sprintf("%#v", microerror.Maskf(invalidConfigError, "POD_NAME env must not be empty")))
-		os.Exit(1)
-	}
 	c.logger.Log("info", "start adding annotations to KVM pod")
 
 	err := f.Validate()
