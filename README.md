@@ -1,4 +1,5 @@
-[![CircleCI](https://circleci.com/gh/giantswarm/k8s-endpoint-updater.svg?&style=shield&circle-token=a37491ec4afc198df5351824d0933ca46aa3ea3a)](https://circleci.com/gh/giantswarm/k8s-endpoint-updater)
+[![CircleCI](https://dl.circleci.com/status-badge/img/gh/giantswarm/k8s-endpoint-updater/tree/master.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/giantswarm/k8s-endpoint-updater/tree/master)
 
 # k8s-endpoint-updater
+
 Update Kubernetes endpoints based on given configuration.
